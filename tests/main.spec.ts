@@ -123,11 +123,18 @@ const tests: Array<TestCase> = [
     byteSpan: [0, 6],
   },
   {
-    name: 'Bignumber Tagged 123',
-    cbor: 'c2417b',
-    value: new BigNumber(123),
-    byteSpan: [0, 3],
+    name: 'Bignumber Tagged 1000000000000000000000',
+    cbor: 'c2493635c9adc5dea00000',
+    value: new BigNumber('1000000000000000000000'),
+    byteSpan: [0, 11],
     tag: 2,
+  },
+  {
+    name: 'Bignumber Tagged -1000000000000000000000000',
+    cbor: 'c3493635c9adc5de9fffff',
+    value: new BigNumber('-1000000000000000000000'),
+    byteSpan: [0, 11],
+    tag: 3,
   },
 ];
 
@@ -145,11 +152,7 @@ describe('cbors', (): void => {
         expect(deepEql(decoded, test.value)).eq(true);
       } else if (test.tag) {
         const dValue = JSON.parse(JSON.stringify(decoded.value));
-        if (BigNumber.isBigNumber(test.value)) {
-          expect(deepEql(dValue.data[0], test.value.toNumber())).eq(true);
-        } else {
-          expect(deepEql(dValue, test.value)).eq(true);
-        }
+        expect(deepEql(dValue, test.value)).eq(true);
       } else {
         expect(decoded).eq(test.value);
       }

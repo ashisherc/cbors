@@ -11,6 +11,15 @@ import CborTag from './CborTag';
 import CborArray from './CborArray';
 import CborMap from './CborMap';
 
+const bytesToBigNumber = (buf: Buffer): BigNumber => {
+  if (buf.length === 0) {
+    return new BigNumber(0);
+  }
+
+  const hex = buf.toString('hex') || '0';
+  return new BigNumber(hex, 16);
+};
+
 const readFloat16 = (value: number): number => {
   const sign = value & 0x8000;
   let exponent = value & 0x7c00;
@@ -386,7 +395,31 @@ class Decoder extends stream.Transform {
         return obj;
       }
       case 6: {
-        const tag = new CborTag(yield* this.parse(), length as number);
+        const tagNumber = length;
+        const taggedValue = yield* this.parse();
+
+        // Handle bignum tags (RFC 8949 / RFC 7049):
+        // Tag 2: positive bignum
+        // Tag 3: negative bignum (-1 - n)
+        if (typeof tagNumber === 'number' && (tagNumber === 2 || tagNumber === 3)) {
+          if (!Buffer.isBuffer(taggedValue)) {
+            // as per spec the tagged value for bignums must be a byte string
+            throw new Error('Invalid bignum encoding: expected byte string');
+          }
+
+          let big = bytesToBigNumber(taggedValue);
+
+          if (tagNumber === 3) {
+            // negative bignum = -1 - n = -(n + 1)
+            big = big.plus(1).negated();
+          }
+
+          // Track byte span from tag start to end of payload
+          return addSpanBytesToObject(big, [startByte, this.offset]);
+        }
+
+        // generic tag handling for everything else
+        const tag = new CborTag(taggedValue, tagNumber as number);
         tag.setByteSpan([startByte, this.offset]);
         return tag;
       }
